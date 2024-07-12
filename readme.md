@@ -34,6 +34,6 @@ GITHUB_BASE_URL=https://api.github.com
 
 #### Run
 ```sh
-cd cmd/server
+cd server
 go run main.go
 ```
