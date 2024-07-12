@@ -17,7 +17,7 @@ type MockGitRepo struct {
 	mock.Mock
 }
 
-func (m *MockGitRepo) CreateCommitRecord(ctx context.Context, commit model.Commit) error {
+func (m *MockGitRepo) CreateCommitRecord(ctx context.Context, commit []model.Commit) error {
 	return m.Called(ctx, commit).Error(0)
 }
 
@@ -57,8 +57,7 @@ type MockGitDetails struct {
 
 func (m *MockGitDetails) FetchRepo(ctx context.Context, owner, repo string) (*object.Repository, int64, error) {
 	return &object.Repository{
-		Name:  repo,
-		Owner: owner,
+		Name: repo,
 	}, 1, nil
 }
 
@@ -75,7 +74,6 @@ func TestFetchRepo(t *testing.T) {
 		FetchRepoFunc: func(ctx context.Context, owner, repo string) (*object.Repository, int64, error) {
 			return &object.Repository{
 				Name:        repo,
-				Owner:       owner,
 				Description: "A sample repository",
 				URL:         "https://github.com/" + owner + "/" + repo,
 				Language:    "Go",
@@ -91,7 +89,6 @@ func TestFetchRepo(t *testing.T) {
 	repo := "repo"
 	repoResp := &object.Repository{
 		Name:            "repo",
-		Owner:           "owner",
 		Description:     "description",
 		URL:             "url",
 		Language:        "Go",
