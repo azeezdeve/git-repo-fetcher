@@ -24,6 +24,52 @@ func NewGithub() object.GitDetails {
 	return github{}
 }
 
+func (g github) SearchRepos(ctx context.Context, interest string) ([]object.Repository, int64, error) {
+	var (
+		response Repositories
+		result   []object.Repository
+	)
+
+	client := resty.New()
+	resp, err := client.R().
+		SetContext(ctx).
+		Get(fmt.Sprintf("%s/search/repositories?q=%s", os.Getenv("GITHUB_BASE_URL"), interest))
+	if err != nil {
+		return nil, 0, err
+	}
+
+	if err := json.Unmarshal(resp.Body(), &response); err != nil {
+		return nil, 0, err
+	}
+
+	for _, rr := range response.Items {
+		result = append(result, object.Repository{
+			Name:            rr.Name,
+			Owner:           rr.Owner.Login,
+			Description:     rr.Description,
+			URL:             rr.Url,
+			Language:        rr.Language,
+			ForksCount:      rr.ForksCount,
+			StarsCount:      rr.StargazersCount,
+			OpenIssuesCount: rr.OpenIssuesCount,
+			WatchersCount:   rr.WatchersCount,
+		})
+	}
+
+	rateLimitReset := resp.Header().Get(rateLimitingResetHeader)
+	rateLimitRemaining := resp.Header().Get(rateLimitingRemainingHeader)
+	if rateLimitRemaining == "0" {
+		resetTime, err := strconv.ParseInt(rateLimitReset, 10, 64)
+		if err != nil {
+			return nil, 0, err
+		}
+
+		return nil, resetTime, errors.New("rate_limit")
+	}
+
+	return result, 0, nil
+}
+
 func (github) FetchRepo(ctx context.Context, owner, repo string) (*object.Repository, int64, error) {
 	client := resty.New()
 	resp, err := client.R().

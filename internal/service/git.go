@@ -13,6 +13,7 @@ import (
 )
 
 type IGitInfo interface {
+	SearchRepos(ctx context.Context, interest string) error
 	FetchRepo(ctx context.Context, name, repo string) (*model.Repository, error)
 	UpdateRepo(ctx context.Context) error
 	GetCommit(ctx context.Context, name, repo string) ([]model.Commit, error)
@@ -27,6 +28,36 @@ type gitInfo struct {
 
 func NewGitInfo(repo repository.IGitRepo, gitDetails object.GitDetails) IGitInfo {
 	return gitInfo{repo: repo, gitDetails: gitDetails}
+}
+
+func (g gitInfo) SearchRepos(ctx context.Context, interest string) error {
+	var (
+		repoResp []object.Repository
+		rate     int64
+		err      error
+	)
+	for {
+		repoResp, rate, err = g.gitDetails.SearchRepos(ctx, interest)
+		if err != nil {
+			if err.Error() == "rate_limit" {
+				time.Sleep(time.Duration(rate) * time.Minute)
+				continue
+			}
+			log.Printf("error fetching repo, err %v", err)
+			return errors.New("unable to process")
+		}
+
+		break
+	}
+
+	for _, rr := range repoResp {
+		err = g.upsertRepo(ctx, rr)
+		if err != nil {
+			log.Printf("error processing repository %s/%s, error: %v", rr.Owner, rr.Name, err)
+		}
+	}
+
+	return nil
 }
 
 func (g gitInfo) FetchRepo(ctx context.Context, owner, repo string) (*model.Repository, error) {
@@ -98,9 +129,9 @@ func (g gitInfo) UpdateRepo(ctx context.Context) error {
 		go func() {
 			defer wg.Done()
 			for repo := range repoChan {
-				_, err := g.FetchRepo(ctx, repo.Owner, repo.Name)
+				_, err := g.GetCommit(ctx, repo.Owner, repo.Name)
 				if err != nil {
-					log.Printf("Error fetching repo: %v", err)
+					log.Printf("Error fetching commit: %v", err)
 				}
 				if len(repoChan) == 0 {
 					fetchMore <- struct{}{}
@@ -211,4 +242,40 @@ func (g gitInfo) GetRepoByLanguage(ctx context.Context, language string) ([]mode
 
 func (g gitInfo) GetTopNRepoByStarCount(ctx context.Context, n int) ([]model.Repository, error) {
 	return g.repo.GetTopNRepoByStarCount(ctx, n)
+}
+
+func (g gitInfo) upsertRepo(ctx context.Context, rr object.Repository) error {
+	repo, err := g.repo.GetRepo(ctx, rr.Name, rr.Owner)
+	if err != nil {
+		return err
+	}
+
+	if repo != nil {
+		err = g.repo.UpdateRepoRecord(ctx, *repo)
+		if err != nil {
+			log.Printf("error updating record with id: %s, error: %v", repo.ID, err)
+			return err
+		}
+	} else {
+		data := model.Repository{
+			ID:              uuid.New(),
+			Name:            rr.Name,
+			Owner:           rr.Owner,
+			Description:     rr.Description,
+			URL:             rr.URL,
+			Language:        rr.Language,
+			ForksCount:      rr.ForksCount,
+			StarsCount:      rr.StarsCount,
+			OpenIssuesCount: rr.OpenIssuesCount,
+			WatchersCount:   rr.WatchersCount,
+			CreatedAt:       rr.CreatedAt,
+			UpdatedAt:       rr.UpdatedAt,
+		}
+		err = g.repo.CreateRepoRecord(ctx, data)
+		if err != nil {
+			log.Printf("error creating record, error: %v", err)
+			return err
+		}
+	}
+	return nil
 }

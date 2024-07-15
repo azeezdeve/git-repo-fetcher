@@ -37,14 +37,23 @@ func main() {
 	ticker := time.NewTicker(5 * time.Hour)
 	defer ticker.Stop()
 
+	commitTicker := time.NewTicker(1 * time.Hour)
+	defer commitTicker.Stop()
+
 	go func() {
 		for {
 			select {
 			case <-ticker.C:
 				log.Println("fetching repository data")
-				err := gitService.UpdateRepo(context.Background())
+				err = gitService.UpdateRepo(context.Background())
 				if err != nil {
-					log.Printf("Error fetching repository data: %v", err)
+					log.Printf("Error updating repository repository data: %v", err)
+				}
+			case <-commitTicker.C:
+				log.Println("search repositories of interest")
+				err = gitService.SearchRepos(context.Background(), "cryptocurrency")
+				if err != nil {
+					log.Printf("Error fetching repository: %v", err)
 				}
 			}
 		}
@@ -65,7 +74,6 @@ func main() {
 
 	router := gin.Default()
 	router.GET("/repos/language/:language", handler.FetchByLanguage)
-	router.GET("/repo/:owner/:repo", handler.FetchRepo)
 	router.GET("/repos/top/:n", handler.GetTopNRepoByStarCount)
 	router.GET("/commit/:owner/:repo", handler.FetchCommit)
 

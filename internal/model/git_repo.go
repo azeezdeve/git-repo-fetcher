@@ -7,8 +7,8 @@ import (
 
 type Repository struct {
 	ID              uuid.UUID
-	Name            string `json:"name"`
-	Owner           string `json:"owner"`
+	Name            string `json:"name" gorm:"uniqueIndex:idx_name_owner"`
+	Owner           string `json:"owner" gorm:"uniqueIndex:idx_name_owner"`
 	Description     string `json:"description"`
 	URL             string `json:"html_url"`
 	Language        string `gorm:"index" json:"language"`

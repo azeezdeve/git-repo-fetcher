@@ -62,6 +62,7 @@ func (g gitRepo) GetRepos(ctx context.Context, size, page int) ([]model.Reposito
 		return nil, 0, err
 	}
 
+	total = total / int64(size)
 	if err := g.db.WithContext(ctx).Model(&model.Repository{}).Offset(offset).Limit(size).Find(&resp).Error; err != nil {
 		return nil, 0, err
 	}

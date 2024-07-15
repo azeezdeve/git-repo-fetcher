@@ -6,12 +6,14 @@ import (
 )
 
 type GitDetails interface {
+	SearchRepos(ctx context.Context, interest string) ([]Repository, int64, error)
 	FetchRepo(ctx context.Context, owner, repo string) (*Repository, int64, error)
 	FetchCommits(ctx context.Context, owner, repo string) ([]Commit, int64, error)
 }
 
 type Repository struct {
 	Name            string `json:"name"`
+	Owner           string `json:"owner"`
 	Description     string `json:"description"`
 	URL             string `json:"html_url"`
 	Language        string `json:"language"`
